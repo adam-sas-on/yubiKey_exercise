@@ -6,6 +6,24 @@ __pycache__/
 # C extensions
 *.so
 
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Temporary files
+tmp*
+temp*
+
 # Distribution / packaging
 .Python
 build/
@@ -51,6 +69,21 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Kernel Module Compile Results
+*.mod*
+*.cmd
+.tmp_versions/
+modules.order
+Module.symvers
+Mkfile.old
+dkms.conf
+
 # Translations
 *.mo
 *.pot
@@ -64,6 +97,9 @@ db.sqlite3-journal
 # Flask stuff:
 instance/
 .webassets-cache
+
+# php settings
+local_settings.php
 
 # Scrapy stuff:
 .scrapy
@@ -127,3 +163,15 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/
+
+# environment script to set DB constants
+setenv.sh
+
+# notes
+notes.txt
