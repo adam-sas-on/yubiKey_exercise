@@ -1,0 +1,106 @@
+* {
+	font-size: 20pt;
+	font-family: "Helvetica Neue",Helvetica,Roboto,Arial,sans-serif;
+	box-sizing: border-box;
+}
+html, body {
+	height: 100%;
+	padding: 0px;
+	margin: 0px;
+	color: #FBE2B4;
+}
+.head {
+	height: 20%;
+}
+div.menu {
+	display: table;
+	width: 100%;
+	margin: 0;
+	padding: 0;
+	border-bottom: 1px solid #FFF;
+
+	background: -webkit-linear-gradient(#432C11, #725E39, #432C11);/* safari 5.1 to 6.0 */
+	background: -o-linear-gradient(#432C11, #725E39, #432C11);/* opera 11.1 to 12.0 */
+	background: -moz-linear-gradient(#432C11, #725E39, #432C11);/* firefox 3.6 to 15 */
+	background: linear-gradient(#432C11, #725E39, #432C11);
+}
+.main {
+	background-color: #432C11;
+	display: table;
+	width: 100%;
+	height: 100%;
+	color: #FFFAFA;
+
+	background: -webkit-linear-gradient(#432C11, #725E39, #432C11);/* safari 5.1 to 6.0 */
+	background: -o-linear-gradient(#432C11, #725E39, #432C11);/* opera 11.1 to 12.0 */
+	background: -moz-linear-gradient(#432C11, #725E39, #432C11);/* firefox 3.6 to 15 */
+	background: linear-gradient(#432C11, #725E39, #432C11);
+}
+.cell {
+	display: table-cell;
+	vertical-align: middle;
+	text-align: center;
+}
+div.menu div.cell a, div.menu div.cell a:link, div.menu div.cell a:visited {
+	color: #FFF;
+	display: block;
+	padding: 1em;
+	font-weight: bold;
+	background-color: rgba(255,255,255,0);
+}
+div.menu div.cell a:hover, div.menu div.cell a:active {
+	background-color: rgba(255,255,255,0.5);
+}
+/*div.menu div.cell {
+	text-align: center;
+	font-size: 1.4em;
+}*/
+
+form {
+	color: #000;
+}
+input {
+	margin: 0.2em 2em;
+	padding: 0.1em;
+}
+a, a:link {
+	color: #4BD283;
+}
+a:visited {
+	color: #00C8C8;
+}
+a:hover {
+	color: #4285F4;
+}
+a:active {
+	color: #FF8040;
+}
+.message {
+	position: fixed;
+	top: 10%;
+	padding: 1em;
+	left: 50%;
+	max-width: 20em;
+	transform: translateX(-50%);
+	border-radius: 20px;
+	border: 1px solid #000;
+	color: #000;
+	background-color: #FFF;
+}
+.message .close {
+	position: relative;
+	border-radius: 50%;
+	margin-right: 1em;
+	cursor: pointer;
+	border: 1px solid #000;
+	display: inline-block;
+}
+.message .content {
+	padding: 0;
+	margin: 0;
+}
+td {
+	word-wrap: break-word;
+	text-align:left;
+}
+
