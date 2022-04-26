@@ -30,9 +30,10 @@ try {
 	$error = $e->getMessage();
 }
 
+$userData = $yubikey->getUserData();
 $user = NULL;
 // $otherUsers = NULL;
-if($success){	
+if( !empty($userData['id']) && $userData['id'] > 0){
 	try {
 		$user = $yubikey->getCurrentUserAndKeys();
 		// $otherUsers = $yubikey->getOtherUsers();
@@ -42,7 +43,6 @@ if($success){
 }
 
 $content = $yubikey->getContent();
-$userData = $yubikey->getUserData();
 
 ?><!DOCTYPE html>
 <html>
@@ -62,7 +62,8 @@ $userData = $yubikey->getUserData();
 </div><?php
 	} else { ?><div class="menu" style="height:20%"><div class="cell">YubiKey register and sign-in<br /></div></div><?php } ?>
 <div class="main"><div class="cell">
-<form method="POST" id="register"><?php if( !$content['logged_in'] ){ ?>
+<form method="POST" id="register"><?php
+if( !$content['logged_in'] ){ ?>
 	<input type="text" name="login" placeholder="Login" <?php
 		if($content['keep_form_values']){
 			?>value=<?php echo "\"", $userData['login'], "\"";
@@ -80,12 +81,24 @@ $userData = $yubikey->getUserData();
 		}
 	?> /><br />
 	<?php if(!$userData['has_keys']){ ?><input type="button" value="Register" /><input type="submit" value="Sign-in" /><?php } ?>
-<?php } else { ?><input type="button" name="yubikey" value="Register YubiKey" /><input type="submit" value="Logout" /><?php }
+<?php
+} else {
+	?><input type="button" name="yubikey" value="Register YubiKey" /><input type="submit" value="Logout" /><?php
+}
 ?><input type="hidden" name="ssid" value="<?php echo session_id(); ?>" />
 </form>
 <div id="info" style="margin-top:1em;"></div>
 </div>
-<div id="keys" class="cell">Keys content<?php if( !empty($user) ){} ?></div>
+<div id="keys" class="cell"><?php /* card of keys; */
+	if( !empty($user) ){
+		if($userData['has_keys']){
+			var_dump($user['keys']);
+		} else {
+			?>You have no FIDO keys to display.<?php
+		}
+	} else {
+		?>No content of keys<?php var_dump($user);
+	} ?></div>
 <?php if(!empty($user['is_superuser']) && $user['is_superuser']){ ?><div id="users" class="cell">Users content</div><?php } ?>
 <div class="message" <?php if(count($content['message']) < 1){ ?>style="display:none"<?php } ?>><span class="close">&times;</span><span class="content"><?php
 	if(count($content['message']) > 0) echo implode("<br />", $content['message']);
