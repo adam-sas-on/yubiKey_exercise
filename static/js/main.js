@@ -10,7 +10,7 @@ var YKey=(function(){
 			     pass: null,
 			     reg: null, sgn: null, logout: [],
 			     keyRegBtn: null, hidden: null, isReg: false,
-			     supports: false, credentials: false,
+			     supports: false, credentials: false, credentialsAreSelected: false,
 			     url: "", ssid: "", uid: -1};
 			infoBox = {box: null,
 			         print: (msg)=>{console.log(msg);},
@@ -83,6 +83,7 @@ var YKey=(function(){
 				str = "This browser supports U2F  and  \"credentials\".";
 				frm.supports=true;
 				frm.credentials = navigator.credentials;
+				createFidoAuthenticationOptions();
 			} else if(u2f){
 				str = "This browser supports U2F.";
 				frm.supports=true;
@@ -154,14 +155,34 @@ var YKey=(function(){
 	}
 
 	function createFidoAuthenticationOptions(){
-		if( !(frm.fr && u2f && navigator.credentials) )
+		if( !(frm.fr && u2f && navigator.credentials) || frm.pass == null )
 			return;
 
-		let u2fRadio, credentialsRadio;
-		u2fRadio = dc.createElement("input");
-		credentialsRadio = dc.createElement("radio");
-		u2fRadio.type = credentialsRadio.type = "radio";
+		let methodSelect, elem;
+		elem = dc.createElement("span");
+		elem.appendChild(dc.createTextNode("Method of FIDO authentication: ") );
+		elem.style.color = "#FFF";
+		elem.style.paddingRight = "1em";
+		frm.fr.appendChild(dc.createElement("br") );
+		frm.fr.appendChild(elem);
 
+		methodSelect = dc.createElement("select");
+		elem = dc.createElement("option");
+		elem.value = "u2f";
+		elem.appendChild(dc.createTextNode("u2f") );
+		methodSelect.appendChild(elem);
+		elem = dc.createElement("option");
+		elem.value = "credentials";
+		elem.appendChild(dc.createTextNode("credentials") );
+		methodSelect.appendChild(elem);
+		frm.fr.appendChild(methodSelect);
+
+		methodSelect.addEventListener("change", function(){
+			if(!this.options)
+				return;
+			let index = this.options.selectedIndex;
+			frm.credentialsAreSelected = this.options[index].value === "credentials";
+		}, false);
 	}
 
 	function setUpJsonLinks(){
@@ -220,10 +241,12 @@ var YKey=(function(){
 			infoBox.msgAppendDom(elm);
 
 			infoBox.msgAppendDom(dc.createElement("br") );
-			infoBox.printMessage("Prepare your key but do not connect to device.", true, true);
+			infoBox.printMessage("Prepare your key.", true, true);
 			infoBox.showMessage();
 
+			/* todo: if(frm.credentialsAreSelected){} else { */
 			sendXML("", null, receiveChallengeAndKeys, "register_check=1", displayResponse);
+			/* } */
 		} else {
 			infoBox.printMessage("Register your security key.", false, true);
 
