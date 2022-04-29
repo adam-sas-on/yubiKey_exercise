@@ -91,9 +91,30 @@ var Account = (function(){
 		row = keyTable.insertRow();
 		insertCol(row, "Usage counter: ", text);
 
-		text = (response.hasOwnProperty('raw_key_response_client') && response['raw_key_response_client'])? response['raw_key_response_client'] : "unknown";
+
 		row = keyTable.insertRow();
-		insertCol(row, "Raw key response client: ", text);
+		if(response.hasOwnProperty('raw_key_response_client') && response['raw_key_response_client']){
+			let parsed = true;
+			try {
+				text = JSON.parse(response['raw_key_response_client']);
+			}catch(e){
+				parsed = false;
+				insertCol(row, "Raw key response client: ", response['raw_key_response_client']);
+			}
+
+			if(parsed){
+				let col = insertCol(row, "Raw key response client: ");
+				Object.keys(text).forEach((key, index) => {
+					if(index > 0)
+						col.appendChild(document.createElement("br") );
+					col.appendChild(document.createTextNode(key) );
+					col.appendChild(document.createTextNode(": ") );
+					col.appendChild(document.createTextNode(text[key]) );
+				});
+			}
+		} else
+			insertCol(row, "Raw key response client: ", "unknown");
+
 
 		text = (response.hasOwnProperty('public_key') && response['public_key'])? response['public_key'] : "unknown";
 		row = keyTable.insertRow();
@@ -201,14 +222,18 @@ var Account = (function(){
 
 	function receiveChangeName(response){
 		if(response.hasOwnProperty('error') || !response.hasOwnProperty('success') ){
-			console.log(response['alert']);
-			if(typeof response['alert'] === 'string' || response['alert'] instanceof String)
-				alert(response['alert']);
+			console.log(response['error']);
+			if(typeof response['error'] === 'string' || response['error'] instanceof String)
+				alert(response['error']);
+			linkTableElements.button.disabled = false;
 			return;
 		}
 
 		if(!response['success']){
 			console.log(response);
+			linkTableElements.button.disabled = false;
+			if(response.hasOwnProperty('message') && (typeof response['message'] === 'string' || response['message'] instanceof String) )
+				alert(response['message']);
 			return;
 		}
 
@@ -230,10 +255,10 @@ var Account = (function(){
 		if(!linkTableElements.activeCheckbox)
 			return;
 
-		if(linkTableElements.activeCheckbox.checked)
-			console.log(linkTableElements.activeCheckbox, "enable");
-		else
-			console.log(linkTableElements.activeCheckbox, "disable");
+		let values = ["active=1"];
+		values.push("ssid=" + encodeURIComponent(ssid));
+		values.push("key_id=" + encodeURIComponent(linkTableElements.keyId));
+
 	}
 
 	function receiveEnableOrDisableKey(response){
@@ -258,9 +283,9 @@ var Account = (function(){
 
 	function receiveCertificateRequest(response){
 		if(response.hasOwnProperty('error') ){
-			console.log(response['alert']);
-			if(typeof response['alert'] === 'string' || response['alert'] instanceof String)
-				alert(response['alert']);
+			console.log(response['error']);
+			if(typeof response['error'] === 'string' || response['error'] instanceof String)
+				alert(response['error']);
 
 			linkTableElements.linkCert.addEventListener("click", sendCertificateRequest, false);
 			return;
@@ -306,9 +331,9 @@ var Account = (function(){
 
 	function receiveRawKeyResponseDataRequest(response){
 		if(response.hasOwnProperty('error') ){
-			console.log(response['alert']);
-			if(typeof response['alert'] === 'string' || response['alert'] instanceof String)
-				alert(response['alert']);
+			console.log(response['error']);
+			if(typeof response['error'] === 'string' || response['error'] instanceof String)
+				alert(response['error']);
 
 			linkTableElements.linkRawData.addEventListener("click", sendRawKeyResponseDataRequest, false);
 			return;
