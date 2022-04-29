@@ -100,7 +100,19 @@ class YubiKey {
 	private function setAjaxTaskNameByPost(){
 		$this->taskName = NULL;
 
-		if( isset($_POST['key_check']) ){
+		$required_keys = array('key_check', 'finish_checking', 'register_check', 'register_finish', 'key_detail',
+		                       'rename', 'cert', 'response_data', 'active');
+		/*if(count(array_diff($required_keys, array_keys($_POST)) ) > 0)
+			return;*/
+
+		foreach($required_keys as $key){
+			if( isset($_POST[$key]) ){
+				$this->taskName = $key;
+				return;
+			}
+		}
+
+		/*if( isset($_POST['key_check']) ){
 			$this->taskName = "key_check";
 		} else if( isset($_POST['finish_checking']) ){
 			$this->taskName = "finish_checking";
@@ -108,7 +120,8 @@ class YubiKey {
 			$this->taskName = "register_check";
 		} else if( isset($_POST['register_finish']) ){
 			$this->taskName = "register_finish";
-		}
+		} else if( isset($_POST['key_detail']) )
+			$this->taskName = "key_detail";*/
 	}
 
 	public function getContent(){
@@ -157,7 +170,11 @@ class YubiKey {
 		}
 
 
-		$sql_query = "SELECT * FROM " . $this->keyTable . " WHERE user_id = ?";
+		$sql_query = "SELECT id, name, key_id,";
+		$sql_query .= "CASE WHEN name IS NULL OR name='' THEN ";
+		$sql_query .= "CASE WHEN key_id IS NULL OR key_id='' THEN id ELSE CONCAT(id, ' (', key_id, ')') END ";
+		$sql_query .= "ELSE name END AS name_p ";
+		$sql_query .= "FROM " . $this->keyTable . " WHERE user_id = ?";
 		$sql_statement = $this->dbConnection->prepare($sql_query);
 
 		if($sql_statement === FALSE){
@@ -213,6 +230,239 @@ class YubiKey {
 		$sql_statement->close();
 
 		return $users;
+	}
+
+	private function openDB_forAjax(){
+		if($this->isDB_opened === FALSE){
+			$this->dbConnection = new mysqli($this->dbParams['hostname'], $this->dbParams['username'], $this->dbParams['password'], $this->dbParams['database']);
+			if($this->dbConnection->connect_error){
+				$this->isDB_opened = FALSE;
+				return FALSE;
+			} else {
+				$this->isDB_opened = TRUE;
+				$this->dbConnection->set_charset("utf-8");
+			}
+		}
+
+		return TRUE;
+	}
+
+	/**
+	 *	Get all details of a key except certificate and response data;
+	 * it also converts datetime into 2 separate values: date and time;
+	 *
+	 * @param  $post  {array}: a POST from request;
+	 * @return  {array}: required properties of a key;
+	 */
+	private function getKeyDetail($post){
+		if($this->userId < 1 || $post['ssid'] !== $this->ssId){
+			return array('header' => $this->headerProtocol . " 403 Forbidden", 'error' => "Bad request!");
+		} elseif(!isset($post['key_id']) ){
+			return array('header' => $this->headerProtocol . " 400 Bad request", 'error' => "Bad request!");
+		}
+
+		$this->openDB_forAjax();
+		if($this->isDB_opened === FALSE){
+			$responseAjax = array('error' => "", 'header' => $this->headerProtocol . " 500 Server error");
+			$responseAjax['error'] = "Problem with opening database! (" . $this->dbConnection->connect_error . ")";// mysqli_connect_errno()
+			return $responseAjax;
+		}
+
+		$responseAjax = array();
+		$sql_query = "SELECT id, name, key_id, key_handle, public_key, usage_counter, raw_key_response_client, is_active, DATE(last_used) AS last_used_date, TIME(last_used) AS last_used_time";
+		$sql_query .= " FROM " . $this->keyTable . " WHERE id = ? AND user_id = ?";
+
+		$sql_statement = $this->dbConnection->prepare($sql_query);
+		if($sql_statement === FALSE){
+			$responseAjax = array('error' => "", 'header' => $this->headerProtocol . " 500 Server error");
+			$responseAjax['error'] = "Problem with DB statement!";
+
+			return $responseAjax;
+		}
+
+		$sql_statement->bind_param("ii", $post['key_id'], $this->userId);
+		$sql_statement->execute();
+
+		$results = $sql_statement->get_result();
+		$sql_statement->close();
+		if($results === FALSE)
+			return array('error' => "Missing keys!", 'header' => $this->headerProtocol . " 404 No keys found.");
+
+
+		$row = $results->fetch_assoc();
+
+		$responseAjax = array('id' => $row['id'],
+		                      'name' => empty($row['name'])? "" : $row['name'],
+		                      'key_id' => empty($row['key_id'])? "" : $row['key_id'],
+		                      'key_handle' => $row['key_handle'],
+		                      'public_key' => $row['public_key'],
+		                      'usage_counter' => $row['usage_counter'],
+		                      'raw_key_response_client' => $row['raw_key_response_client'],
+		                      'is_active' => $row['is_active'],
+		                      'last_used_date' => $row['last_used_date'],
+		                      'last_used_time' => $row['last_used_time']);
+
+		return $responseAjax;
+	}
+
+	/**
+	 *	Rename key in table of FIDO keys for specified id for user with select id
+	 *
+	 * @param  $post  {array}: a POST from request;
+	 * @return  {array}: AJAX response array to json;
+	 */
+	private function renameKey($post){
+		if($this->userId < 1 || $post['ssid'] !== $this->ssId){
+			return array('header' => $this->headerProtocol . " 403 Forbidden", 'error' => "Bad request!");
+		} elseif(!isset($post['key_id']) || !isset($post['name']) || (isset($post['name']) && strlen($post['name']) < 1) ){
+			return array('header' => $this->headerProtocol . " 400 Bad request", 'error' => "Bad request!");
+		}
+
+		$this->openDB_forAjax();
+		if($this->isDB_opened === FALSE){
+			$responseAjax = array('error' => "", 'header' => $this->headerProtocol . " 500 Server error");
+			$responseAjax['error'] = "Problem with opening database! (" . $this->dbConnection->connect_error . ")";// mysqli_connect_errno()
+			return $responseAjax;
+		}
+
+		$responseAjax = array();
+		$sql_query = "UPDATE " . $this->keyTable . " SET name = ? WHERE id = ? AND user_id = ?";
+
+		$sql_statement = $this->dbConnection->prepare($sql_query);
+		if($sql_statement === FALSE){
+			$responseAjax = array('error' => "", 'header' => $this->headerProtocol . " 500 Server error");
+			$responseAjax['error'] = "Problem with DB statement!";
+
+			return $responseAjax;
+		}
+
+		$sql_statement->bind_param("sii", $post['name'], $post['key_id'], $this->userId);
+		$sql_statement->execute();
+
+		if($sql_statement->affected_rows > 0){
+			$responseAjax = array('success' => TRUE, 'message' => "Name is changed.");
+		} else {
+			$responseAjax = array('success' => FALSE, 'message' => "Name not changed.");
+		}
+
+		$sql_statement->close();
+
+		return $responseAjax;
+	}
+
+	/**
+	 *
+	 */
+	private function getSingleColumn($post, $columnName){
+		if($this->userId < 1 || $post['ssid'] !== $this->ssId){
+			return array('header' => $this->headerProtocol . " 403 Forbidden", 'error' => "Bad request!");
+		} elseif(!isset($post['key_id']) ){
+			return array('header' => $this->headerProtocol . " 400 Bad request", 'error' => "Bad request!");
+		}
+
+		$this->openDB_forAjax();
+		if($this->isDB_opened === FALSE){
+			$responseAjax = array('error' => "", 'header' => $this->headerProtocol . " 500 Server error");
+			$responseAjax['error'] = "Problem with opening database! (" . $this->dbConnection->connect_error . ")";// mysqli_connect_errno()
+			return $responseAjax;
+		}
+
+		$sql_query = "SELECT " . $columnName . " FROM " . $this->keyTable . " WHERE id = ? AND user_id = ?";
+
+		$sql_statement = $this->dbConnection->prepare($sql_query);
+		if($sql_statement === FALSE){
+			$responseAjax = array('error' => "", 'header' => $this->headerProtocol . " 500 Server error");
+			$responseAjax['error'] = "Problem with DB statement!";
+
+			return $responseAjax;
+		}
+
+		$sql_statement->bind_param("ii", $post['key_id'], $this->userId);
+		$sql_statement->execute();
+
+		$results = $sql_statement->get_result();
+		$sql_statement->close();
+
+		return array('results' => $results);
+	}
+
+	/**
+	 *
+	 */
+	private function getCertificate(array $post){
+		$results = $this->getSingleColumn($post, "certificate");
+		if(isset($results['header']) && isset($results['error']) )
+			return $results;
+
+		$results = $results['results'];
+
+		if($results === FALSE)
+			return array('error' => "Missing certificate!", 'header' => $this->headerProtocol . " 404 No certificate found.");
+
+		$row = $results->fetch_assoc();
+		$responseAjax = array('id' => $post['key_id'], 'cert' => $row['certificate']);
+
+		return $responseAjax;
+	}
+
+	/**
+	 *
+	 */
+	private function getResponseDataOfKey($post){
+		$results = $this->getSingleColumn($post, "raw_key_response_data");
+		if(isset($results['header']) && isset($results['error']) )
+			return $results;
+
+		$results = $results['results'];
+
+		if($results === FALSE)
+			return array('error' => "Missing data of key response!", 'header' => $this->headerProtocol . " 404 No data found.");
+
+		$row = $results->fetch_assoc();
+		$responseAjax = array('id' => $post['key_id'], 'key_data' => $row['raw_key_response_data']);
+
+		return $responseAjax;
+	}
+
+	/**
+	 */
+	private function activeDeactiveKey($post){
+		if($this->userId < 1 || $post['ssid'] !== $this->ssId){
+			return array('header' => $this->headerProtocol . " 403 Forbidden", 'error' => "Bad request!");
+		} elseif(!isset($post['key_id']) ){
+			return array('header' => $this->headerProtocol . " 400 Bad request", 'error' => "Bad request!");
+		}
+
+		$this->openDB_forAjax();
+		if($this->isDB_opened === FALSE){
+			$responseAjax = array('error' => "", 'header' => $this->headerProtocol . " 500 Server error");
+			$responseAjax['error'] = "Problem with opening database! (" . $this->dbConnection->connect_error . ")";// mysqli_connect_errno()
+			return $responseAjax;
+		}
+
+		$responseAjax = array();
+		$sql_query = "UPDATE " . $this->keyTable . " SET is_active = NOT is_active WHERE id = ? AND user_id = ?";
+
+		$sql_statement = $this->dbConnection->prepare($sql_query);
+		if($sql_statement === FALSE){
+			$responseAjax = array('error' => "", 'header' => $this->headerProtocol . " 500 Server error");
+			$responseAjax['error'] = "Problem with DB statement!";
+
+			return $responseAjax;
+		}
+
+		$sql_statement->bind_param("ii", $post['key_id'], $this->userId);
+		$sql_statement->execute();
+
+		if($sql_statement->affected_rows > 0){
+			$responseAjax = array('success' => TRUE, 'message' => "Activation changed.");
+		} else {
+			$responseAjax = array('success' => FALSE, 'message' => "Activation not changed.");
+		}
+
+		$sql_statement->close();
+
+		return $responseAjax;
 	}
 
 	/**
@@ -365,6 +615,16 @@ class YubiKey {
 			$responseAjax = $this->u2f_keyCheckFinish();
 		else if($this->taskName === "register_finish")
 			$responseAjax = $this->u2f_finishRegister();
+		else if($this->taskName === "key_detail")
+			$responseAjax = $this->getKeyDetail($_POST);
+		else if($this->taskName === "rename")
+			$responseAjax = $this->renameKey($_POST);
+		else if($this->taskName === "cert")
+			$responseAjax = $this->getCertificate($_POST);
+		else if($this->taskName === "response_data")
+			$responseAjax = $this->getResponseDataOfKey($_POST);
+		else if($this->taskName === "active")
+			$responseAjax = $this->activeDeactiveKey($_POST);
 
 		return $responseAjax;
 	}
