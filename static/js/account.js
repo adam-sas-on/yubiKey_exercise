@@ -137,7 +137,7 @@ var Account = (function(){
 			linkTableElements.activeCheckbox = document.createElement("input");
 			linkTableElements.activeCheckbox.type = "checkbox";
 			linkTableElements.activeCheckbox.checked = (response['is_active'])? true : false;
-			/*linkTableElements.activeCheckbox.addEventListener("click", enableOrDisableKey, false); https://stackoverflow.com/questions/5575338/what-the-difference-between-click-and-change-on-a-checkbox */
+			linkTableElements.activeCheckbox.addEventListener("click", sendEnableOrDisableKey, false);
 			insertCol(row, "Is active: ").appendChild(linkTableElements.activeCheckbox);
 		}
 
@@ -259,9 +259,28 @@ var Account = (function(){
 		values.push("ssid=" + encodeURIComponent(ssid));
 		values.push("key_id=" + encodeURIComponent(linkTableElements.keyId));
 
+		ajax.fetch("", null, receiveEnableOrDisableKey, values.join('&'), receiveEnableOrDisableKey);
 	}
 
 	function receiveEnableOrDisableKey(response){
+		if(response.hasOwnProperty('error') || !response.hasOwnProperty('success') ){
+			console.log(response['error']);
+			if(typeof response['error'] === 'string' || response['error'] instanceof String)
+				alert(response['error']);
+			return;
+		}
+
+		if(!response['success']){
+			console.log(response);
+			if(response.hasOwnProperty('message') && (typeof response['message'] === 'string' || response['message'] instanceof String) )
+				alert(response['message']);
+			return;
+		}
+
+		if(response.hasOwnProperty('active') ){
+			linkTableElements.activeCheckbox.checked = (response['active'])? true : false;
+		}
+
 		console.log(response);
 	}
 
