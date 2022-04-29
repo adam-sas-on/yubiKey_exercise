@@ -91,13 +91,22 @@ if( !$content['logged_in'] ){ ?>
 </div>
 <div id="keys" class="cell"><?php /* card of keys; */
 	if( !empty($user) ){
-		if($userData['has_keys']){
+		if(count($user['keys']) > 0){
+			?><form><select><option value="">Select FIDO key:</option><?php
+				foreach($user['keys'] as $key){
+					?><option value="<?php echo $key['id']; ?>"><?php echo $key['name_p']; ?></option><?php
+				}
+			?></select><br />
+			<input type="button" value="Show key" disabled /></form><br />
+
+			<table id="key_detail"><tr><td><?php
 			var_dump($user['keys']);
+			?></td></tr></table><?php
 		} else {
 			?>You have no FIDO keys to display.<?php
 		}
 	} else {
-		?>No content of keys<?php var_dump($user);
+		?>No content of keys<?php
 	} ?></div>
 <?php if(!empty($user['is_superuser']) && $user['is_superuser']){ ?><div id="users" class="cell">Users content</div><?php } ?>
 <div class="message" <?php if(count($content['message']) < 1){ ?>style="display:none"<?php } ?>><span class="close">&times;</span><span class="content"><?php
@@ -111,7 +120,7 @@ if( !$content['logged_in'] ){ ?>
 ?>);</script><?php
 if(isset($content['logged_in']) && $content['logged_in'] === TRUE){
 	?><script type="module">
-	//import("./static/js/another_file.js").then( (module) => {module.default.startMethod();});
+	import("./static/js/account.js").then( (module) => {module.default.init();});
 	</script><?php
 }
 ?><script id="data_json" type="application/json">[{"url":"https://webauthn.guide/", "desc":"navigator.credentials @ webauthn.guide;"},{"url":"https://developers.yubico.com/U2F/Libraries/Using_a_library.html", "desc":"Yubico dev - Using a U2F library;"},{"url":"https://developers.yubico.com/WebAuthn/WebAuthn_Developer_Guide/WebAuthn_Client_Registration.html", "desc":"Yubico - WebAuthn Client Registration (some graphs);"},{"url":"https://fidoalliance.org/specs/fido-u2f-v1.2-ps-20170411/fido-u2f-overview-v1.2-ps-20170411.html#registration-creating-a-key-pair", "desc":"Universal 2nd Factor (U2F) Overview @ fidoalliance;"},
