@@ -119,6 +119,8 @@ const ajax = {
 
 		fetchProps.headers = {"Accept":"application/json", "Content-Type":"application/x-www-form-urlencoded", "X-Requested-With": "XMLHttpRequest"};
 
+		if(ajaxSets.useContent)
+			fetchProps.body = ajaxSets.content;
 		// fetchProps.signal = new AbortController().signal;
 
 		fetch(ajaxSets.endpoint, fetchProps).then(res => {

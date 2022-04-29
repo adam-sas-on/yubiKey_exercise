@@ -462,6 +462,24 @@ class YubiKey {
 
 		$sql_statement->close();
 
+		// - - - check and send new data;
+		$sql_query = "SELECT is_active FROM " . $this->keyTable . " WHERE id = ? AND user_id = ?";
+		$sql_statement = $this->dbConnection->prepare($sql_query);
+		if($sql_statement === FALSE)
+			return $responseAjax;
+
+		$sql_statement->bind_param("ii", $post['key_id'], $this->userId);
+		$sql_statement->execute();
+
+		$results = $sql_statement->get_result();
+		$sql_statement->close();
+
+		if($results === FALSE)
+			return $responseAjax;
+
+		$row = $results->fetch_assoc();
+		$responseAjax['active'] = $row['is_active'];
+
 		return $responseAjax;
 	}
 
