@@ -64,6 +64,8 @@ class YubiKey {
 				$this->taskName = "register";
 			else if( isset($_POST['logout']) )
 				$this->taskName = "logout";
+			else if( isset($_POST['key_check']) && isset($_POST['login']) && isset($_POST['pswd']) )
+				$this->taskName = 'key_check';
 
 
 			$this->displayContent = array('logged_in' => isset($_SESSION['logged_in']), 'session_id' => "", 'message' => array(), 'keep_form_values' => FALSE);
@@ -484,34 +486,7 @@ class YubiKey {
 	}
 
 	/**
-	 *	Checks if page is requested for logging in or registration.
-	 * If it is then appropriate action is taken.
 	 *
-	 * @return  {bool}
-	 */
-	public function signInOrRegisterUser($post){
-		if( !isset($post['login']) || empty($post['login']) || !isset($post['pswd']) || empty($post['pswd']) )
-			return FALSE;
-
-		if($this->taskName !== "signin" && $this->taskName !== "register")
-			return FALSE;
-
-		if($this->taskName === "signin"){
-			$success = $this->getUserByLoginAndPassword($post['login'], $post['pswd']);
-		} else {
-			$success = $this->registerUser($post['login'], $post['pswd']);
-		}
-
-		return $success;
-	}
-
-	/**
-	 *	Checks if user with defined login and password exists;
-	 * it also sets userData and displayContent properties of this class;
-	 *
-	 * @param  $login  {string}: login or e-mail of registered user;
-	 * @param  $password  {string}: his password as plain text (e.g. string from <input type="password" />);
-	 * @return  {bool}: TRUE for success, FALSE otherwise;
 	 */
 	private function getUserByLoginAndPassword($login, $password){
 		if($this->isDB_opened === FALSE || $this->userId > 0)
@@ -530,11 +505,9 @@ class YubiKey {
 		$sql_query = $sql_query . " FROM " . $this->userTable . " WHERE (username = ? OR email = ?) AND is_active = 1";
 
 		$sql_statement = $this->dbConnection->prepare($sql_query);
-		$exists = FALSE;
 		$user = NULL;
 		if($sql_statement === FALSE){
-			$this->displayContent['message'][] = "Something's wrong: " . $this->dbConnection->error . " (" . $this->dbConnection->errno . ")";
-			return FALSE;
+			throw new Exception("Something's wrong: " . $this->dbConnection->error . " (" . $this->dbConnection->errno . ")");
 		}
 
 		$sql_statement->bind_param("ss", $this->userData['login'], $this->userData['login']);
@@ -543,11 +516,51 @@ class YubiKey {
 		$results = $sql_statement->get_result();
 		if($results !== FALSE){
 			$user = $results->fetch_assoc();
-			$exists = TRUE;
 		}
 		$sql_statement->close();
 
-		if($exists === FALSE || $user === NULL){
+		return $user;
+	}
+
+	/**
+	 *	Checks if page is requested for logging in or registration.
+	 * If it is then appropriate action is taken.
+	 *
+	 * @return  {bool}
+	 */
+	public function checkToSignInOrRegisterUser($post){
+		if( !isset($post['login']) || empty($post['login']) || !isset($post['pswd']) || empty($post['pswd']) )
+			return FALSE;
+
+		if($this->taskName !== "signin" && $this->taskName !== "register")
+			return FALSE;
+
+		if($this->taskName === "signin"){
+			$success = $this->signinAndCheckFidoKeys($post['login'], $post['pswd']);
+		} else {
+			$success = $this->registerUser($post['login'], $post['pswd']);
+		}
+
+		return $success;
+	}
+
+	/**
+	 *	Checks if user with defined login and password exists;
+	 * it also sets userData and displayContent properties of this class;
+	 *
+	 * @param  $login  {string}: login or e-mail of registered user;
+	 * @param  $password  {string}: his password as plain text (e.g. string from <input type="password" />);
+	 * @return  {bool}: TRUE for success, FALSE otherwise;
+	 */
+	private function signinAndCheckFidoKeys($login, $password){
+		try {
+			$user = $this->getUserByLoginAndPassword($login, $password);
+		} catch(Exception $e){
+			$this->displayContent['message'][] = $e->getMessage();
+			return FALSE;
+		}
+
+		if($user === FALSE || $user === NULL){
 			$this->displayContent['message'][] = "Not such user in a system! Click register if you want to add a new one.";
 			$this->displayContent['keep_form_values'] = TRUE;
 			return FALSE;
@@ -627,9 +640,12 @@ class YubiKey {
 			return $this->U2F->getRegisters();
 
 		$responseAjax = array();
-		if($this->taskName === "key_check")
-			$responseAjax = $this->u2f_keyCheck();
-		else if($this->taskName === "finish_checking")
+		if($this->taskName === "key_check"){
+			if($this->userId != -1)
+				$responseAjax = $this->u2f_keyCheck();
+			else if($this->U2F === NULL)
+				$responseAjax = $this->u2f_checkUserAndFidoKeys($_POST);
+		} else if($this->taskName === "finish_checking")
 			$responseAjax = $this->u2f_keyCheckFinish();
 		else if($this->taskName === "register_finish")
 			$responseAjax = $this->u2f_finishRegister();
@@ -643,6 +659,58 @@ class YubiKey {
 			$responseAjax = $this->getResponseDataOfKey($_POST);
 		else if($this->taskName === "active")
 			$responseAjax = $this->activeDeactiveKey($_POST);
+
+		return $responseAjax;
+	}
+
+	/**
+	 *	Checks if user defined by login and password has FIDO keys.
+	 * If he has then it returns them;
+	 *
+	 * @param  $post  {array}: a POST from request;
+	 * @return  {array}: response for AJAX;
+	 */
+	private function u2f_checkUserAndFidoKeys($post){
+		if( !isset($post['login']) || empty($post['login']) || !isset($post['pswd']) || empty($post['pswd']) )
+			return array('success' => FALSE, 'message' => "Login and password are missing.");
+
+		if( !isset($post['ssid']) || $post['ssid'] !== $this->ssId){
+			$responseAjax = array('error' => "Forbidden request!", 'header' => "");
+			$responseAjax['header'] = $this->headerProtocol . " 403 Forbidden";// header($responseAjax['header']);
+			return $responseAjax;
+		}
+
+		try {
+			$user = $this->getUserByLoginAndPassword($post['login'], $post['pswd']);
+		}catch(Exception $e){
+			return array('message' => $e->getMessage() );
+		}
+
+		if($user === FALSE || $user === NULL){
+			return array('message' => "Not such user in a system! Click register if you want to add a new one.");
+		}
+
+		$exists = password_verify($this->userData['password'], $user['password']);
+		if(!$exists){
+			return array('message' => "Password mismatch!");
+		}
+
+		$responseAjax = array('has_keys' => FALSE, 'keys' => array() );
+		if($user['count_keys'] > 0){
+			$responseAjax['has_keys'] = TRUE;
+		} else
+			return $responseAjax;
+
+		$this->U2F = new U2F_example($user['id'], $this->dbParams, $this->host, $this->isSSL);
+
+		$fidoKeys = $this->U2F->getRegisters($this->userTable);
+		if(count($fidoKeys['signs']) < 1){
+			return $responseAjax;
+		}
+
+		$sign = $fidoKeys['signs'][0];
+		$fidoKeys['challenge'] = $sign['challenge'];
+		$responseAjax['keys'] = $fidoKeys;
 
 		return $responseAjax;
 	}

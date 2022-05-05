@@ -25,7 +25,7 @@ if($responseAjax !== NULL){
 $error = "";
 $success = FALSE;
 try {
-	$success = $yubikey->signInOrRegisterUser($_POST);
+	$success = $yubikey->checkToSignInOrRegisterUser($_POST);
 }catch(Exception $e){
 	$error = $e->getMessage();
 }
