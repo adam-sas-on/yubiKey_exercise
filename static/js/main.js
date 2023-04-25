@@ -77,14 +77,14 @@ var YKey=(function(){
 			};
 		}
 
-		if(u2f || navigator.credentials){
+		if(typeof u2f !== 'undefined' || navigator.credentials){
 			let str = "";
-			if(u2f && navigator.credentials){
+			if(typeof  u2f !== 'undefined' && navigator.credentials){
 				str = "This browser supports U2F  and  \"credentials\".";
 				frm.supports=true;
 				frm.credentials = navigator.credentials;
 				createFidoAuthenticationOptions();
-			} else if(u2f){
+			} else if(typeof u2f !== 'undefined'){
 				str = "This browser supports U2F.";
 				frm.supports=true;
 			} else {
@@ -225,6 +225,18 @@ var YKey=(function(){
 			YKeyObj.callbackFn = registerSteps;
 	}
 
+	function showInitialMessage(){
+		infoBox.printMessage("You will be asked to verify yourself by hardware key.", false, true);
+
+		elm = dc.createElement("img");
+		elm.style.width="40%";
+		elm.src = frm.url.substring(0, frm.url.lastIndexOf('/')) + "/static/images/yubiKey.jpg";
+		infoBox.msgAppendDom(elm);
+
+		infoBox.msgAppendDom(dc.createElement("br") );
+		infoBox.showMessage();
+	}
+
 	function registerSteps(){
 		if(!infoBox.msg){
 			infoBox.print("Watch console to see all steps!");
@@ -347,15 +359,7 @@ var YKey=(function(){
 
 		if(YKeyObj.regSteps < 1){
 			/* first step to check user by YubiKey; */
-			infoBox.printMessage("You will be asked to verify yourself by hardware key.", false, true);
-
-			elm = dc.createElement("img");
-			elm.style.width="40%";
-			elm.src = frm.url.substring(0, frm.url.lastIndexOf('/')) + "/static/images/yubiKey.jpg";
-			infoBox.msgAppendDom(elm);
-
-			infoBox.msgAppendDom(dc.createElement("br") );
-			infoBox.showMessage();
+			showInitialMessage();
 
 			let values = ["key_check=1"];
 			values.push("ssid=" + encodeURIComponent(frm.ssid));
