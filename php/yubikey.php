@@ -210,7 +210,7 @@ class YubiKey {
 		if(!$this->isSuperuser)
 			return FALSE;
 
-		$sql_query = "SELECT * FROM yubikey_user WHERE NOT id = ?";
+		$sql_query = "SELECT * FROM " . $this->userTable . " WHERE NOT id = ?";
 		$sql_statement = $this->dbConnection->prepare($sql_query);
 
 		if($sql_statement === FALSE){
@@ -637,7 +637,7 @@ class YubiKey {
 			return NULL;
 
 		if($this->taskName === "register_check")
-			return $this->U2F->getRegisters();
+			return $this->U2F->getRegisters($this->userTable, TRUE);
 
 		$responseAjax = array();
 		if($this->taskName === "key_check"){

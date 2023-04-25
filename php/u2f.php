@@ -36,7 +36,8 @@ class U2F_example {
 	 *	Creates u2f object with random challenge id
 	 * to register new u2f FIDO key or to check registered one;
 	 *
-	 * @return: u2f default object with challenge id;
+	 * @return array: u2f default object with challenge id;
+	 * @throws Exception
 	 */
 	public function getFirstRegister(){
 		$challenge = random_bytes(32);
@@ -56,11 +57,21 @@ class U2F_example {
 	 * and includes registered keys with another random challenge id
 	 * if $userTable is defined;
 	 *
-	 * @param  $userTable  {string}: name of database table which stores registered users;
-	 * @return: u2f object with default challenge id and registered keys if $userTable is defined;
+	 * @param  $userTable {string}: name of database table which stores registered users;
+	 * @param  $saveFirstRegister {bool}: makes this method to save challenge from first register
+	 *                                     instead of challenge from getKeys() method;
+	 * @return array: u2f object with default challenge id and registered keys if $userTable is defined;
+	 * @throws Exception
 	 */
-	public function getRegisters($userTable = NULL){
+	public function getRegisters($userTable = NULL, $saveFirstRegister = FALSE){
 		$registerData = $this->getFirstRegister();
+
+		$userTableForOtherChallenge = $userTable;
+		if(!empty($userTable) && $saveFirstRegister === TRUE){
+			$this->saveLastChallenge($registerData['challenge'], $userTable);
+			$userTableForOtherChallenge = NULL;
+		}
+
 		if($this->databaseTable === NULL)
 			return $registerData;
 
@@ -84,7 +95,7 @@ class U2F_example {
 		if($count_keys < 1)
 			return $registerData;
 
-		$registerData['signs'] = $this->getKeys($userTable);
+		$registerData['signs'] = $this->getKeys($userTableForOtherChallenge);
 		return $registerData;
 	}
 
@@ -200,7 +211,7 @@ class U2F_example {
 			throw new Exception('Client data does not match required "challenge"', ERR_NO_MATCHING_REQUEST);
 
 		if(isset($clientData->origin) && !in_array($clientData->origin, $this->facetIds, true))
-            throw new Exception('App ID does not match the origin.', ERR_NO_MATCHING_ORIGIN);
+			throw new Exception('App ID does not match the origin.', ERR_NO_MATCHING_ORIGIN);
 
 
 		$keys = $this->getKeysByKeyHandle($u2fSignData->keyHandle);
@@ -328,7 +339,7 @@ class U2F_example {
 	/**
 	 * @param $registration: array object with properties/keys respective to model properties:
 	 *                       'key_id', 'key_handle', 'public_key', 'certificate', 'counter', 'signature', 'client_data' and 'registration_data';
-	 * @return  {bool}: TRUE if savev successfully, FALSE otherwise;
+	 * @return {bool}: TRUE if saved successfully, FALSE otherwise;
 	 * @throws Exception
 	 */
 	private function saveKey($registration){
